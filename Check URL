@@ -1,0 +1,111 @@
+#!/usr/bin/env python3
+import urllib3, smtplib, time, mysql.connector
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+
+## This code fetchs url data from the sql server and checks the url accordingly. 
+## Saves the result and sends notification if the website is not running properly.
+## If you want to add a website to check, simply adding one row in FoxWebLog.URLs2Test at sql server would work.
+
+## Connect to SQL server ##
+cnx = mysql.connector.connect(user = 'root', password = 'some password',
+                              host = '127.0.0.1', database = 'FoxWebLog')
+cursor = cnx.cursor()
+
+## Fetch search data from the database ##
+cursor.execute("select URL, Text2Look4, Title from FoxWebLog.URLs2Test;")
+checkdata = cursor.fetchall()
+
+http = urllib3.PoolManager()
+
+for i in range(len(checkdata)):
+
+    url, search, title = checkdata[i][0], checkdata[i][1], checkdata[i][2]
+    send_email = True
+
+    ########################
+    ## Check Each Website ##
+    ########################
+    
+    try:
+        
+        start = time.time()
+        r = http.request('GET', url, timeout = 30, retries = 2)
+        finish = time.time()
+
+    except:
+        
+        web_response = False
+        code = None
+        time_spent = 0
+        
+        subject = "Cannot Connect to the Some Name Website"
+        HTML = "Connection TimeOut"
+        
+    else:
+        
+        web_response = True
+        code = r.status
+        time_spent = round(finish - start, 2)
+
+        if search not in r.data.decode():
+            subject = "Some Name's " + title + " not showing properly"
+            HTML = r.data.decode()
+            
+        else:
+            send_email = False
+            HTML = None
+
+    ###################################
+    ## Save Data in MariaDB or MySQL ##
+    ###################################
+
+    ## Call stored procedure to save data ##
+    add_data = cursor.callproc('savedata', args = (code, time_spent, HTML, i + 1))
+
+    ## Send Email IF something happened on websties ##
+    if send_email:
+
+        sender = 'some sender email'
+        to = ['some recipient email','another recipient email','another...']
+        cc = ['some cc','another...']
+
+        msg = MIMEMultipart()
+        msg['From'] = sender
+        msg['To'] = ', '.join(to)
+        msg['Cc'] = ', '.join(cc)
+        msg['Subject'] = subject
+        msg['X-Priority'] = '1'
+
+        cursor.execute("""select max(Log_DateTime) from FoxWebLog.Saved_Responses
+                       where HTML_Returned is NULL and URL_ID = {};""".format(i + 1))
+        resp = str(cursor.fetchone()[0])
+
+        ## If Bad Response ##
+        if web_response:
+            
+            body = '<br>HTTP Response Code: <b>' + str(r.status) + '</b>'
+            body += '<br>Response Time: <b>' + str(time_spent) + ' seconds</b>'
+            body += '<br>Last Successful Response Time: <b>' + resp
+            body += '<br><br>Web Page returned below from: <b>' + url
+            body += '</b><br><br>' + r.data.decode()
+
+        ## If TimeOut ##
+        elif not web_response:
+            
+            body = '<br><b>Some Name Website Request Timed Out</b>'
+            body += '<br>TimeOut = 60 seconds'
+            body += '<br>Last Successful Response: <b>' + resp
+            body += '</b><br>Please Check the Website: ' + url
+        
+        msg.attach(MIMEText(body, 'html'))
+        
+        server = smtplib.SMTP('smtp.office365.com', 587)
+        server.starttls()
+        server.login(sender, 'Some Password')
+        server.sendmail(sender, to+cc, msg.as_string())
+        server.quit()
+        
+cnx.commit()
+cursor.close()
+cnx.close()
