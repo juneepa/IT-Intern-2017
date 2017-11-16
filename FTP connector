@@ -1,6 +1,6 @@
 import ftplib, os, urllib
 
-## This code let you connect to the ftp server and upload files to certain directory
+## This code let you connect to the ftp server and upload files to certain directory 
 
 ## Connect and Log in to the ftp server
 ftp = ftplib.FTP()
