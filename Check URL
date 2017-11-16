@@ -4,7 +4,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 ## This code fetchs url data from the sql server and checks the url accordingly. 
-## Saves the result and sends notification if the website is not running properly.
+## Saves the result and sends notification if the website is not running properly. 
 ## If you want to add a website to check, simply adding one row in FoxWebLog.URLs2Test at sql server would work.
 
 ## Connect to SQL server ##
