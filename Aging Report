@@ -1,5 +1,9 @@
 Sub Rows_ColumnName_Format()
 
+'    Fix this code accordingly
+'    Some column titles are hidden
+'    Creates nice and clean aging report from the raw data
+
 '    Change Column Names
     Range("A1").FormulaR1C1 = "Some Name"
     Range("B1").FormulaR1C1 = "Some Name"
